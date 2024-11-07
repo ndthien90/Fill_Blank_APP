@@ -8,6 +8,8 @@
             --bg-color: #ffffff;
             --text-color: #000000;
             --card-bg: #f5f5f5;
+            --selected-color: #3498db;
+            --correct-color: #2ecc71;
         }
 
         .dark-mode {
@@ -26,21 +28,21 @@
             justify-content: center;
             min-height: 100vh;
         }
-        h3{
-              Color: white;
-              font-size: 25px;
-             }
+
+        h3 {
+            color: white;
+            font-size: 25px;
+        }
 
         .container {
-            max-width: 800px;
+            max-width: 600px;
             max-height: 900px;
             width: 100%;
             background-color: var(--bg-color);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             border-radius: 15px;
             padding: 20px;
             margin: 20px;
-            transition: background-color 0.3s;
         }
 
         .header {
@@ -63,7 +65,7 @@
             cursor: pointer;
             font-size: 30px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.2s;
         }
 
         button:hover {
@@ -85,18 +87,21 @@
             background-color: #e67e22;
             color: white;
         }
+
         #confirmTimer {
             background-color: #10d60d;
             color: white;
-        } 
+        }
+
         #cancelTimer {
             background-color: #e67e22;
             color: white;
-        } 
+        }
 
         #dataBtn {
             background-color: #2ecc71;
             color: white;
+            display: none;
         }
 
         #darkModeBtn {
@@ -114,7 +119,7 @@
             font-family: Arial, sans-serif;
             border: 2px solid #0ca3fa;
             height: 35px;
-            display:none;
+           display: none;
         }
 
         .timer {
@@ -132,7 +137,6 @@
 
         .timer:hover {
             transform: scale(1.05);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         .questions {
@@ -142,7 +146,7 @@
 
         .question {
             margin: 5px 0;
-            font-size: 40px;
+            font-size: 35px;
             background-color: var(--card-bg);
             padding: 8px;
             border-radius: 10px;
@@ -159,7 +163,7 @@
         .question-number {
             flex-shrink: 0;
             min-width: 30px;
-           font-size: 40px;
+            font-size: 40px;
         }
 
         .question-text {
@@ -180,19 +184,21 @@
             border-radius: 5px;
             vertical-align: middle;
             margin: 0 5px;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
 
-        .blank.hover {
-            background-color: rgba(52, 152, 219, 0.2);
-            transform: scale(1.05);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        .blank.selected {
+            background-color: var(--selected-color);
+            border-color: var(--selected-color);
+            color: white;
         }
 
         .blank.correct {
-            background-color: #2ecc71;
+            background-color: var(--correct-color);
+            border-color: var(--correct-color);
             color: white;
-            border: 2px solid #27ae60;
+            cursor: default;
         }
 
         .answers {
@@ -200,24 +206,28 @@
             gap: 10px;
             margin-top: 20px;
             flex-wrap: wrap;
-            font-size: 40px;
+            font-size: 35px;
             font-family: 'Kaiti', sans-serif;
         }
 
         .answer {
             padding: 10px 20px;
             border-radius: 5px;
-            cursor: move;
+            cursor: pointer;
             user-select: none;
-            transition: transform 0.2s;
-            animation: fadeIn 0.3s ease-out;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
             border: 2px dashed #3498db;
         }
 
         .answer:hover {
             transform: scale(1.05);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .answer.selected {
+            background-color: var(--selected-color);
+            border-color: var(--selected-color);
+            color: white;
         }
 
         .timer-dialog {
@@ -240,21 +250,6 @@
             border: 1px solid #ccc;
             border-radius: 5px;
             font-size: 20px;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .hidden {
-            display: none;
         }
     </style>
 </head>
@@ -290,10 +285,12 @@
         let questions = [];
         let answers = new Set();
         let isGameStarted = false;
+        let selectedBlank = null;
+        let selectedAnswer = null;
         
         let allQuestions = [];
         let usedQuestions = new Set();
-        let QUESTIONS_PER_GAME = 6;  // Now this is variable based on input
+        let QUESTIONS_PER_GAME = 6;
 
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -346,6 +343,76 @@
             return selectedQuestions;
         }
 
+        function handleBlankClick(blank) {
+            if (blank.classList.contains('correct')) return;
+
+            // Deselect previously selected blank
+            if (selectedBlank) {
+                selectedBlank.classList.remove('selected');
+            }
+
+            // Select new blank
+            blank.classList.add('selected');
+            selectedBlank = blank;
+
+            // If both blank and answer are selected, try to match
+            if (selectedAnswer) {
+                tryMatch();
+            }
+        }
+
+        function handleAnswerClick(answer) {
+            if (answer.classList.contains('used')) return;
+
+            // Deselect previously selected answer
+            if (selectedAnswer) {
+                selectedAnswer.classList.remove('selected');
+            }
+
+            // Select new answer
+            answer.classList.add('selected');
+            selectedAnswer = answer;
+
+            // If both blank and answer are selected, try to match
+            if (selectedBlank) {
+                tryMatch();
+            }
+        }
+
+        function tryMatch() {
+            if (!selectedBlank || !selectedAnswer) return;
+
+            if (selectedBlank.dataset.answer === selectedAnswer.textContent) {
+                // Correct match
+                selectedBlank.textContent = selectedAnswer.textContent;
+                selectedBlank.classList.remove('selected');
+                selectedBlank.classList.add('correct');
+                selectedAnswer.classList.remove('selected');
+                selectedAnswer.classList.add('used');
+                selectedAnswer.style.display = 'none';
+
+                // Reset selections
+                selectedBlank = null;
+                selectedAnswer = null;
+
+                // Check if all answers are correct
+                const allCorrect = Array.from(document.querySelectorAll('.blank'))
+                    .every(b => b.classList.contains('correct'));
+                if (allCorrect) {
+                    setTimeout(() => {
+                        alert('Chúc mừng bạn đã hoàn thành!');
+                        clearInterval(timer);
+                    }, 100);
+                }
+            } else {
+                // Wrong match - deselect both
+                selectedBlank.classList.remove('selected');
+                selectedAnswer.classList.remove('selected');
+                selectedBlank = null;
+                selectedAnswer = null;
+            }
+        }
+
         function createQuestionElements() {
             const questionsContainer = document.getElementById('questions');
             const answersContainer = document.getElementById('answers');
@@ -373,6 +440,7 @@
                     const blank = document.createElement('div');
                     blank.className = 'blank';
                     blank.dataset.answer = ans.answer;
+                    blank.addEventListener('click', () => handleBlankClick(blank));
                     blanks.push(blank);
                     answers.add(ans.answer);
                 });
@@ -399,66 +467,9 @@
             shuffledAnswers.forEach(answer => {
                 const answerDiv = document.createElement('div');
                 answerDiv.className = 'answer';
-                answerDiv.draggable = true;
                 answerDiv.textContent = answer;
-                answerDiv.id = `answer-${answer}`;
+                answerDiv.addEventListener('click', () => handleAnswerClick(answerDiv));
                 answersContainer.appendChild(answerDiv);
-            });
-            
-            setupDragAndDrop();
-        }
-
-        function setupDragAndDrop() {
-            const answerElements = document.querySelectorAll('.answer');
-            const blanks = document.querySelectorAll('.blank');
-
-            answerElements.forEach(answer => {
-                answer.addEventListener('dragstart', (e) => {
-                    e.dataTransfer.setData('text/plain', answer.textContent);
-                    e.dataTransfer.setData('answerId', answer.id);
-                    answer.style.opacity = '0.5';
-                });
-
-                answer.addEventListener('dragend', (e) => {
-                    answer.style.opacity = '1';
-                });
-            });
-
-            blanks.forEach(blank => {
-                blank.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    blank.classList.add('hover');
-                });
-
-                blank.addEventListener('dragleave', (e) => {
-                    blank.classList.remove('hover');
-                });
-
-                blank.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    blank.classList.remove('hover');
-                    const answer = e.dataTransfer.getData('text/plain');
-                    const answerId = e.dataTransfer.getData('answerId');
-                    
-                    if (blank.dataset.answer === answer) {
-                        const answerElement = document.getElementById(answerId);
-                        if (answerElement) {
-                            answerElement.remove();
-                        }
-                        
-                        blank.textContent = answer;
-                        blank.classList.add('correct');
-                        
-                        const allCorrect = Array.from(blanks).every(b => 
-                            b.classList.contains('correct'));
-                        if (allCorrect) {
-                            setTimeout(() => {
-                                alert('Chúc mừng bạn đã hoàn thành!');
-                                clearInterval(timer);
-                            }, 100);
-                        }
-                    }
-                });
             });
         }
 
@@ -467,7 +478,7 @@
             const input = document.getElementById('timerInput');
             input.value = timeLeft;
             dialog.style.display = 'block';
-        }
+}
 
         function hideTimerDialog() {
             document.getElementById('timerDialog').style.display = 'none';
@@ -488,7 +499,7 @@
                 updateTimerDisplay();
                 if (timeLeft <= 0) {
                     clearInterval(timer);
-                    alert('Time\'s up!');
+                    alert('Hết giờ!');
                 }
             }, 1000);
         }
@@ -501,11 +512,8 @@
             document.getElementById('questions').style.display = 'none';
             document.getElementById('answers').style.display = 'none';
             
-            const blanks = document.querySelectorAll('.blank');
-            blanks.forEach(blank => {
-                blank.textContent = '';
-                blank.classList.remove('correct', 'hover');
-            });
+            selectedBlank = null;
+            selectedAnswer = null;
             
             // Update QUESTIONS_PER_GAME from input before selecting questions
             const questionCountInput = document.getElementById('questionCount');
@@ -516,7 +524,6 @@
                 questionCountInput.value = QUESTIONS_PER_GAME;
             }
             
-            // Select questions based on updated QUESTIONS_PER_GAME
             questions = selectRandomQuestions();
             createQuestionElements();
             
@@ -528,7 +535,7 @@
 
         document.getElementById('confirmTimer').addEventListener('click', () => {
             const newTime = parseInt(document.getElementById('timerInput').value);
-            if (newTime && !isNaN(newTime) && newTime >= 1 && newTime <= 600) {
+            if (newTime && !isNaN(newTime) && newTime >= 1 && newTime <= 1800) {
                 timeLeft = newTime;
                 updateTimerDisplay();
                 if (isGameStarted) {
@@ -546,7 +553,6 @@
             document.getElementById('darkModeBtn').textContent = isDarkMode ? '☀️' : '🌙';
         });
 
-        // Add event listener for question count input
         document.getElementById('questionCount').addEventListener('change', (e) => {
             const newCount = parseInt(e.target.value);
             if (newCount && newCount >= 1 && newCount <= 20) {
@@ -635,3 +641,4 @@
     </script>
 </body>
 </html>
+        
